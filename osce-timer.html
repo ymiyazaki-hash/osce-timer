@@ -369,7 +369,11 @@ details[open].details-card .details-summary::after{transform:rotate(-180deg)}
           <input id="volumeRange" type="range" min="0" max="3" step="0.1" value="1" />
           <p style="font-size:.82rem;color:var(--text-sub);margin:4px 0 0">💡 音声の最大音量はシステム音量に依存します。より大きくするにはデバイスの音量を上げてください。</p>
         </div>
-        <button id="btnTestVoice" class="btn">🗣 声のテスト</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button id="btnTestChime" class="btn">🔔 チャイム音のテスト</button>
+          <button id="btnTestVoice" class="btn">🗣 声のテスト</button>
+        </div>
+        <p id="sfxDiagLine" style="font-size:.78rem;color:var(--text-sub);margin:8px 0 0;word-break:break-all"></p>
       </div>
     </details>
 
@@ -589,28 +593,42 @@ function speak(text,onDone){if(!text?.trim()||!window.speechSynthesis){onDone?.(
 // 壁時計ベースのタイマー変数
 let _tickWallStart=null,_tickRemainAtStart=null;
 
-/* ── 効果音：WAVをJSで生成し <audio> で再生（iOSで最も確実） ── */
-function wavURI(fn,dur,sr){sr=sr||22050;const n=Math.ceil(sr*dur),buf=new ArrayBuffer(44+n*2),dv=new DataView(buf);
+/* ── 効果音：WAVをJSで生成し <audio> で再生 ──
+   iOS Safari は <audio> の data: URI を再生できないため Blob URL を使う */
+function wavBlobURL(fn,dur,sr){sr=sr||22050;const n=Math.ceil(sr*dur),buf=new ArrayBuffer(44+n*2),dv=new DataView(buf);
   const ws=(o,s)=>{for(let i=0;i<s.length;i++)dv.setUint8(o+i,s.charCodeAt(i))};
   ws(0,'RIFF');dv.setUint32(4,36+n*2,true);ws(8,'WAVE');ws(12,'fmt ');dv.setUint32(16,16,true);
   dv.setUint16(20,1,true);dv.setUint16(22,1,true);dv.setUint32(24,sr,true);dv.setUint32(28,sr*2,true);
   dv.setUint16(32,2,true);dv.setUint16(34,16,true);ws(36,'data');dv.setUint32(40,n*2,true);
   for(let i=0;i<n;i++){let v=fn(i/sr);v=v<-1?-1:v>1?1:v;dv.setInt16(44+i*2,Math.round(v*32767),true)}
-  const b=new Uint8Array(buf);let s='';for(let i=0;i<b.length;i++)s+=String.fromCharCode(b[i]);
-  return 'data:audio/wav;base64,'+btoa(s)}
+  return URL.createObjectURL(new Blob([buf],{type:'audio/wav'}))}
 const TONE={
   chime:[t=>{if(t>1.25)return 0;let v=0;for(const[f,a,d]of[[660,1,.34],[1320,.18,.2],[1980,.06,.12]]){const e=Math.exp(-t/d)*(t<.012?t/.012:1);v+=Math.sin(2*Math.PI*f*t)*a*e}return v*.55},1.3],
   bell30:[t=>{if(t>.26)return 0;const e=Math.exp(-t/.07)*(t<.015?t/.015:1);return Math.sin(2*Math.PI*660*t)*e*.65},.3],
   bellEnd:[t=>{const i=Math.floor(t/.28);if(i>2)return 0;const lt=t-i*.28;if(lt>.26)return 0;const e=Math.exp(-lt/.07)*(lt<.015?lt/.015:1);return Math.sin(2*Math.PI*880*lt)*e*.65},.88]
 };
-const sfx={};
-function buildSfx(){try{Object.keys(TONE).forEach(k=>{const[fn,d]=TONE[k];const a=new Audio(wavURI(fn,d));a.preload='auto';a.load();sfx[k]=a});
-  try{if(navigator.audioSession)navigator.audioSession.type='playback'}catch{}}catch(e){console.warn('buildSfx',e)}}
+const sfx={};let sfxDiag='未初期化';
+function buildSfx(){try{Object.keys(TONE).forEach(k=>{const[fn,d]=TONE[k];
+    const a=document.createElement('audio');
+    a.src=wavBlobURL(fn,d);a.preload='auto';
+    a.setAttribute('playsinline','');a.setAttribute('webkit-playsinline','');
+    a.style.display='none';document.body.appendChild(a);   /* iOSはDOM内の要素の方が確実 */
+    a.load();sfx[k]=a});
+  sfxDiag='生成OK';
+  try{if(navigator.audioSession)navigator.audioSession.type='playback'}catch{}
+}catch(e){sfxDiag='生成失敗:'+e.name;console.warn('buildSfx',e)}}
 let sfxUnlocked=false;
-function unlockSfx(){if(sfxUnlocked)return;const ks=Object.keys(sfx);let ok=0;ks.forEach(k=>{const a=sfx[k];try{a.volume=0;const p=a.play();const done=s=>{try{a.pause();a.currentTime=0;a.volume=1}catch{}if(s&&++ok>=ks.length)sfxUnlocked=true};if(p&&p.then)p.then(()=>done(true)).catch(()=>done(false));else done(true)}catch{}})}
+function unlockSfx(){if(sfxUnlocked)return;const ks=Object.keys(sfx);let ok=0;ks.forEach(k=>{const a=sfx[k];try{a.volume=0;const p=a.play();const done=(s,e)=>{try{a.pause();a.currentTime=0;a.volume=1}catch{}if(s){if(++ok>=ks.length){sfxUnlocked=true;sfxDiag='解除OK'}}else sfxDiag='解除失敗:'+(e&&e.name||'?')};if(p&&p.then)p.then(()=>done(true)).catch(e=>done(false,e));else done(true)}catch(e){sfxDiag='解除例外:'+e.name}})}
 function playSfx(k){const a=sfx[k];const v=Math.min(1,state.settings.volume);if(v<=0)return;
-  if(a){try{a.pause();a.currentTime=0;a.volume=v;const p=a.play();if(p&&p.catch)p.catch(()=>webAudioFallback(k,v));return}catch{}}
+  if(a){try{a.pause();a.currentTime=0;a.volume=v;const p=a.play();
+    if(p&&p.then)p.then(()=>{sfxDiag='再生OK'}).catch(e=>{sfxDiag='再生失敗:'+e.name+'→WebAudio';webAudioFallback(k,v)});
+    else sfxDiag='再生OK(旧API)';
+    return}catch(e){sfxDiag='再生例外:'+e.name}}
+  else sfxDiag='要素なし→WebAudio';
   webAudioFallback(k,v)}
+/* 音の状態を1行で返す（テストボタン用） */
+function sfxStatus(){const a=sfx.chime;return[sfxDiag,a?'ready='+a.readyState:'要素なし',audioCtx?'ctx='+audioCtx.state:'ctx無',
+  'vol='+state.settings.volume,navigator.audioSession?'session='+navigator.audioSession.type:'session非対応'].join(' / ')}
 /* Web Audio フォールバック（<audio> が使えない環境向け） */
 function webAudioFallback(k,v){try{if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();
   const go=()=>{const t0=audioCtx.currentTime+.03,beeps=k==='bellEnd'?3:1,freq=k==='chime'?660:k==='bellEnd'?880:660,dec=k==='chime'?1:.22;
@@ -757,6 +775,8 @@ function bindEvents(){
     }
   });
   el.btnTestVoice.addEventListener('click',()=>{unlockAudio();playChime();setTimeout(()=>speak('これは音声のテストです。試験を開始してください。'),1100)});
+  $('btnTestChime').addEventListener('click',()=>{unlockAudio();playChime();
+    setTimeout(()=>{const p=$('sfxDiagLine');if(p)p.textContent='状態: '+sfxStatus()},400)});
   document.getElementById('importFile').addEventListener('change',e=>{const f=e.target.files[0];if(f)importJSON(f);e.target.value=''});
   document.getElementById('btnSaveDevice').addEventListener('click',async()=>{
     const name=(document.getElementById('saveNameInput').value.trim()||'OSCEタイマー')+'-'+new Date().toISOString().slice(0,10);
