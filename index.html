@@ -376,13 +376,13 @@ details[open].details-card .details-summary::after{transform:rotate(-180deg)}
     <!-- データ保存・読み込み -->
     <div class="card" style="padding:20px">
       <p style="font-size:.95rem;font-weight:600;margin:0 0 14px;color:var(--text)">💾 設定の保存・読み込み</p>
-      <div style="display:flex;gap:10px">
-        <button id="btnSaveDevice" class="btn btn-block" style="flex:1;padding:18px 12px;font-size:1.05rem;font-weight:700;background:var(--blue);color:#fff;border:none;border-radius:12px">📥 本体に保存</button>
-        <label for="importFile" class="btn btn-block" style="flex:1;padding:18px 12px;font-size:1.05rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:12px">📂 本体から読み込み</label>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <input id="saveNameInput" type="text" placeholder="ファイル名（例：OSCE2025）" style="flex:1;padding:12px 14px;font-size:16px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text)" />
+        <button id="btnSaveDevice" class="btn" style="padding:12px 18px;font-size:1rem;font-weight:700;background:var(--blue);color:#fff;border:none;border-radius:10px;white-space:nowrap">📥 保存</button>
       </div>
+      <label for="importFile" class="btn btn-block" style="padding:14px;font-size:1rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:10px">📂 本体から読み込み</label>
       <p style="font-size:.82rem;color:var(--text-sub);margin:10px 0 0;text-align:center">設定をJSONファイルとして端末に保存・復元できます</p>
       <input id="importFile" type="file" style="display:none" />
-      <input id="saveNameInput" style="display:none" />
       <button id="btnPresetSave" style="display:none"></button>
       <div id="presetList" style="display:none"></div>
       <p id="presetEmpty" style="display:none"></p>
