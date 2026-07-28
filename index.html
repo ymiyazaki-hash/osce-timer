@@ -813,7 +813,7 @@ function bindEvents(){
   el.btnAddClosing.addEventListener('click',()=>{addStep(state.closingSteps);persistCurrent();renderSectionList('closing',state.closingSteps,el.closingList,el.closingTime);renderSummaryBar()});
   el.btnLoadDefault.addEventListener('click',()=>{loadDefaultData();persistCurrent();applyToUI()});
   el.btnGoRun.addEventListener('click',()=>{if(!state.openingSteps.length&&!state.mainSteps.length&&!state.closingSteps.length){showToast('ステップを追加してください');return}state.confirmMode=false;unlockAudio();showView('run');resetRoutine()});
-  $('btnGoConfirm').addEventListener('click',()=>{unlockAudio();state.confirmMode=true;buildFlatSteps();state.running=true;showView('run');el.confirmModeLabel.hidden=false;gotoFlat(0)});
+  $('btnGoConfirm').addEventListener('click',()=>{unlockAudio();state.confirmMode=true;showView('run');resetRoutine();el.confirmModeLabel.hidden=false;buildFlatSteps()});
   el.rateRange.addEventListener('input',()=>{state.settings.rate=parseFloat(el.rateRange.value);el.rateVal.textContent=state.settings.rate.toFixed(1);saveSettings()});
   el.volumeRange.addEventListener('input',()=>{state.settings.volume=parseFloat(el.volumeRange.value);el.volumeVal.textContent=state.settings.volume.toFixed(1);document.getElementById('runVolumeRange').value=state.settings.volume;document.getElementById('runVolumeVal').textContent=state.settings.volume.toFixed(1);saveSettings()});
   document.getElementById('runVolumeRange').addEventListener('input',e=>{state.settings.volume=parseFloat(e.target.value);document.getElementById('runVolumeVal').textContent=state.settings.volume.toFixed(1);el.volumeRange.value=state.settings.volume;el.volumeVal.textContent=state.settings.volume.toFixed(1);saveSettings()});
