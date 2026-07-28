@@ -589,7 +589,8 @@ function speak(text,onDone){if(!text?.trim()||!window.speechSynthesis){onDone?.(
 // 壁時計ベースのタイマー変数
 let _tickWallStart=null,_tickRemainAtStart=null;
 
-function playChime(){try{if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();const resume=audioCtx.resume();const v=state.settings.volume;if(v<=0)return;resume.then(()=>{try{const vol=Math.min(0.9,v*0.55);const t=audioCtx.currentTime;
+function ensureAudio(){if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();return audioCtx.state==='running'?Promise.resolve():audioCtx.resume()}
+function playChime(){try{const p=ensureAudio();const v=state.settings.volume;if(v<=0)return;p.then(()=>{try{const vol=Math.min(0.9,v*0.55);const t=audioCtx.currentTime+0.05;
 // 「ポーン」：660Hzを芯にしてサイン波を重ねて1秒伸ばす
 const specs=[[660,1,1.0],[1320,0.18,0.6],[1980,0.06,0.35]];
 specs.forEach(([freq,amp,decay])=>{
@@ -601,7 +602,7 @@ specs.forEach(([freq,amp,decay])=>{
   osc.connect(g).connect(audioCtx.destination);
   osc.start(t);osc.stop(t+1.1);
 })}catch{}})}catch{}}
-function playBell(type){try{if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();const resume=audioCtx.resume();const vv=state.settings.volume;if(vv<=0)return;resume.then(()=>{try{const beeps=type==='end'?3:1,freq=type==='end'?880:660,vol=Math.min(0.9,vv*0.4);for(let i=0;i<beeps;i++){const t=audioCtx.currentTime+i*0.28,osc=audioCtx.createOscillator(),gain=audioCtx.createGain();osc.type='sine';osc.frequency.value=freq;gain.gain.setValueAtTime(0.0001,t);gain.gain.exponentialRampToValueAtTime(vol,t+0.02);gain.gain.exponentialRampToValueAtTime(0.0001,t+0.22);osc.connect(gain).connect(audioCtx.destination);osc.start(t);osc.stop(t+0.24)}}catch{}})}catch{}}
+function playBell(type){try{const p=ensureAudio();const vv=state.settings.volume;if(vv<=0)return;p.then(()=>{try{const beeps=type==='end'?3:1,freq=type==='end'?880:660,vol=Math.min(0.9,vv*0.4);for(let i=0;i<beeps;i++){const t=audioCtx.currentTime+0.05+i*0.28,osc=audioCtx.createOscillator(),gain=audioCtx.createGain();osc.type='sine';osc.frequency.value=freq;gain.gain.setValueAtTime(0.0001,t);gain.gain.exponentialRampToValueAtTime(vol,t+0.02);gain.gain.exponentialRampToValueAtTime(0.0001,t+0.22);osc.connect(gain).connect(audioCtx.destination);osc.start(t);osc.stop(t+0.24)}}catch{}})}catch{}}
 function unlockAudio(){if(voiceUnlocked)return;voiceUnlocked=true;el.audioHint.hidden=true;try{if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();if(audioCtx.state==='suspended')audioCtx.resume()}catch{}if(window.speechSynthesis){const u=new SpeechSynthesisUtterance('');u.volume=0;speechSynthesis.speak(u)}}
 
 // ── タイマー制御 ──────────────────────────────────
@@ -711,7 +712,7 @@ function bindEvents(){
   el.btnTheme.addEventListener('click',()=>applyTheme(state.settings.theme==='dark'?'light':'dark'));
   el.btnFullscreen.addEventListener('click',toggleFullscreen);
   document.addEventListener('fullscreenchange',()=>{el.btnFullscreen.textContent=document.fullscreenElement?'✕':'⛶'});
-  el.btnStart.addEventListener('click',()=>{unlockAudio();togglePause()});
+  el.btnStart.addEventListener('click',()=>{unlockAudio();if(audioCtx)audioCtx.resume();togglePause()});
   el.btnPrev.addEventListener('click',prevFlat);el.btnNext.addEventListener('click',nextFlat);
   $('btnSleepHelp').addEventListener('click',()=>{const ov=$('sleepHelpOverlay');ov.style.display='flex'});
   $('btnSleepHelpClose').addEventListener('click',()=>{$('sleepHelpOverlay').style.display='none'});
