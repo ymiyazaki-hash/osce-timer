@@ -394,10 +394,13 @@ details[open].details-card .details-summary::after{transform:rotate(-180deg)}
 
         <p class="card-note" style="margin-top:12px;background:var(--surface-2);border-radius:8px;padding:10px">⚠️ ブラウザのキャッシュを消去すると消えます。端末に残したい場合は下の「本体に保存」をお試しください。</p>
 
-        <!-- 本体に保存（環境依存） -->
+        <!-- 本体に保存・読み込み（環境依存） -->
         <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
-          <p style="font-size:.9rem;color:var(--text-sub);margin:0 0 8px">端末のファイルとして保存（環境によっては動作しない場合があります）</p>
-          <button id="btnSaveDevice" class="btn btn-block" style="padding:14px">📥 本体に保存</button>
+          <p style="font-size:.9rem;color:var(--text-sub);margin:0 0 8px">端末のファイルとして保存・読み込み（環境によっては動作しない場合があります）</p>
+          <div style="display:flex;gap:8px">
+            <button id="btnSaveDevice" class="btn btn-block" style="padding:14px;flex:1">📥 本体に保存</button>
+            <label for="importFile" class="btn btn-block" style="padding:14px;flex:1;cursor:pointer;display:flex;align-items:center;justify-content:center">📂 本体から読み込み</label>
+          </div>
         </div>
 
         <input id="importFile" type="file" style="display:none" />
