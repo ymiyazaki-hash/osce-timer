@@ -649,7 +649,7 @@ function renderSectionList(section,arr,listEl,timeEl){
   updateSectionTime(arr,timeEl);
 }
 function renderRepeatList(){const count=state.repeatCount;el.repeatTotalTime.textContent=`合計 ${humanSec(repeatAllSec())}`;el.repeatList.innerHTML='';for(let ri=0;ri<count;ri++)el.repeatList.appendChild(makeRepeatItem(ri))}
-function renderSummaryBar(){const oSec=openingTotalSec(),rSec=repeatAllSec(),cSec=closingTotalSec(),total=oSec+rSec+cSec;el.summaryBar.innerHTML=`<span>合計 ${humanMin(total)}</span><div class="summary-seg"><div class="seg-dot blue"></div><span>① ${humanMin(oSec)}</span></div><div class="summary-seg"><div class="seg-dot green"></div><span>②×${state.repeatCount} ${humanMin(rSec)}</span></div>`}
+function renderSummaryBar(){const oSec=openingTotalSec(),rSec=repeatAllSec(),cSec=closingTotalSec(),t12=oSec+rSec,t123=t12+cSec;el.summaryBar.innerHTML=`<span>①＋② ＝ ${humanMin(t12)}</span><span style="margin:0 4px;color:var(--text-sub)">｜</span><span>①＋②＋③ ＝ ${humanMin(t123)}</span>`}
 
 function makeRepeatItem(ri){const tpl=el.repeatItemTpl.content.firstElementChild.cloneNode(true);const isCustom=!!state.rounds[ri]?.customized;const labelEl=tpl.querySelector('.repeat-label'),badgeEl=tpl.querySelector('.repeat-badge'),timeEl=tpl.querySelector('.repeat-time'),bodyEl=tpl.querySelector('.repeat-body'),editBtn=tpl.querySelector('.act-edit-round'),resetBtn=tpl.querySelector('.act-reset-round'),addBtn=tpl.querySelector('.act-round-add'),listEl=tpl.querySelector('.round-step-list');
 labelEl.textContent=`${ri+1} 回目`;badgeEl.textContent=isCustom?'個別編集済み':'基本と同じ';timeEl.textContent=humanSec(roundSec(ri));editBtn.textContent='✎ 個別に編集';resetBtn.hidden=!isCustom;bodyEl.hidden=true;
