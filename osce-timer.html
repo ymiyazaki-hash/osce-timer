@@ -612,35 +612,68 @@ const TONE={
   bell30:[t=>{if(t>.26)return 0;const e=Math.exp(-t/.07)*(t<.015?t/.015:1);return Math.sin(2*Math.PI*660*t)*e*.65},.3],
   bellEnd:[t=>{const i=Math.floor(t/.28);if(i>2)return 0;const lt=t-i*.28;if(lt>.26)return 0;const e=Math.exp(-lt/.07)*(lt<.015?lt/.015:1);return Math.sin(2*Math.PI*880*lt)*e*.65},.88]
 };
-const sfx={};let sfxDiag='未初期化';
-function buildSfx(){try{Object.keys(TONE).forEach(k=>{const[fn,d]=TONE[k];
-    const a=document.createElement('audio');
-    a.src=wavBlobURL(fn,d);a.preload='auto';
-    a.setAttribute('playsinline','');a.setAttribute('webkit-playsinline','');
-    a.style.display='none';document.body.appendChild(a);   /* iOSはDOM内の要素の方が確実 */
-    a.load();sfx[k]=a});
-  sfxDiag='生成OK';
+/* ── 音声再生戦略 ──────────────────────────────────────────────────
+   iOS SpeechSynthesis はオーディオセッションを「音声」モードにするため
+   <audio> 要素の音が自動的に絞られる（ダッキング）。
+   AudioContext の BufferSource は同じメディアレイヤーで鳴るためダッキングを受けない。
+   → アンロック（ユーザージェスチャー解除）は <audio> で行い、
+     実際のチャイム再生は AudioContext BufferSource を使う。
+   ─────────────────────────────────────────────────────────────── */
+const sfxBufs={};   /* OfflineAudioContext でプリレンダーしたバッファ */
+const sfxEls={};    /* アンロック専用 <audio> 要素 */
+let sfxDiag='未初期化',sfxUnlocked=false;
+
+/* 1. プリレンダー（ユーザー操作不要） */
+async function buildSfx(){
+  /* アンロック用ダミー <audio> を1つ作成 */
+  const dummy=document.createElement('audio');
+  dummy.src=wavBlobURL(()=>0,0.05);  /* 50ms の無音WAV */
+  dummy.setAttribute('playsinline','');dummy.setAttribute('webkit-playsinline','');
+  dummy.style.display='none';document.body.appendChild(dummy);
+  sfxEls.dummy=dummy;
+  /* OfflineAudioContext でチャイム音をプリレンダー */
+  const sr=22050;
+  const jobs=[
+    ['chime',1.3,buf=>{[[660,1,.34],[1320,.18,.2],[1980,.06,.12]].forEach(([f,a,d])=>{const o=buf.createOscillator(),g=buf.createGain();o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(.0001,0);g.gain.exponentialRampToValueAtTime(.9*a,0.012);g.gain.exponentialRampToValueAtTime(.0001,d);o.connect(g).connect(buf.destination);o.start(0);o.stop(1.3)})}],
+    ['bell30',.3,buf=>{const o=buf.createOscillator(),g=buf.createGain();o.type='sine';o.frequency.value=660;g.gain.setValueAtTime(.0001,0);g.gain.exponentialRampToValueAtTime(.9,.015);g.gain.exponentialRampToValueAtTime(.0001,.22);o.connect(g).connect(buf.destination);o.start(0);o.stop(.28)}],
+    ['bellEnd',.9,buf=>{for(let i=0;i<3;i++){const t=i*.28,o=buf.createOscillator(),g=buf.createGain();o.type='sine';o.frequency.value=880;g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.9,t+.015);g.gain.exponentialRampToValueAtTime(.0001,t+.22);o.connect(g).connect(buf.destination);o.start(t);o.stop(t+.25)}}]
+  ];
+  for(const[name,dur,fill] of jobs){
+    try{const off=new OfflineAudioContext(1,Math.ceil(sr*dur),sr);fill(off);sfxBufs[name]=await off.startRendering()}
+    catch(e){console.warn('buildSfx',name,e)}
+  }
+  sfxDiag='バッファ生成OK';
   try{if(navigator.audioSession)navigator.audioSession.type='playback'}catch{}
-}catch(e){sfxDiag='生成失敗:'+e.name;console.warn('buildSfx',e)}}
-let sfxUnlocked=false;
-function unlockSfx(){if(sfxUnlocked)return;const ks=Object.keys(sfx);let ok=0;ks.forEach(k=>{const a=sfx[k];try{a.volume=0;const p=a.play();const done=(s,e)=>{try{a.pause();a.currentTime=0;a.volume=1}catch{}if(s){if(++ok>=ks.length){sfxUnlocked=true;sfxDiag='解除OK'}}else sfxDiag='解除失敗:'+(e&&e.name||'?')};if(p&&p.then)p.then(()=>done(true)).catch(e=>done(false,e));else done(true)}catch(e){sfxDiag='解除例外:'+e.name}})}
-function playSfx(k){const a=sfx[k];const v=Math.min(1,state.settings.volume);if(v<=0)return;
-  if(a){try{a.pause();a.currentTime=0;a.volume=v;const p=a.play();
-    if(p&&p.then)p.then(()=>{sfxDiag='再生OK'}).catch(e=>{sfxDiag='再生失敗:'+e.name+'→WebAudio';webAudioFallback(k,v)});
-    else sfxDiag='再生OK(旧API)';
-    return}catch(e){sfxDiag='再生例外:'+e.name}}
-  else sfxDiag='要素なし→WebAudio';
-  webAudioFallback(k,v)}
-/* 音の状態を1行で返す（テストボタン用） */
-function sfxStatus(){const a=sfx.chime;return[sfxDiag,a?'ready='+a.readyState:'要素なし',audioCtx?'ctx='+audioCtx.state:'ctx無',
-  'vol='+state.settings.volume,navigator.audioSession?'session='+navigator.audioSession.type:'session非対応'].join(' / ')}
-/* Web Audio フォールバック（<audio> が使えない環境向け） */
-function webAudioFallback(k,v){try{if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();
-  const go=()=>{const t0=audioCtx.currentTime+.03,beeps=k==='bellEnd'?3:1,freq=k==='chime'?660:k==='bellEnd'?880:660,dec=k==='chime'?1:.22;
-    for(let i=0;i<beeps;i++){const t=t0+i*.28,o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='sine';o.frequency.value=freq;
-      g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(Math.min(.9,v*.55),t+.02);g.gain.exponentialRampToValueAtTime(.0001,t+dec);
-      o.connect(g).connect(audioCtx.destination);o.start(t);o.stop(t+dec+.05)}};
-  audioCtx.state==='running'?go():audioCtx.resume().then(go).catch(()=>{})}catch{}}
+}
+
+/* 2. アンロック：<audio>ダミーで iOS の再生制限を解除 ＆ AudioContext を resume */
+function unlockSfx(){
+  if(sfxUnlocked)return;
+  const dummy=sfxEls.dummy;
+  if(!dummy)return;
+  dummy.volume=0;
+  const p=dummy.play();
+  const done=(ok,err)=>{try{dummy.pause();dummy.currentTime=0}catch{};
+    if(ok){sfxUnlocked=true;sfxDiag='アンロックOK';
+      /* <audio>が再生できたらAudioContextも起こしておく */
+      if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+      audioCtx.resume().catch(()=>{})
+    }else sfxDiag='アンロック失敗:'+(err&&err.name||'?')};
+  if(p&&p.then)p.then(()=>done(true)).catch(e=>done(false,e));else done(true);
+}
+
+/* 3. 再生：AudioContext BufferSource（ダッキング非対象） */
+function playSfx(k){
+  const vol=Math.min(1,state.settings.volume);if(!vol)return;
+  const buf=sfxBufs[k];
+  if(buf&&audioCtx){
+    const play=()=>{try{const src=audioCtx.createBufferSource(),g=audioCtx.createGain();src.buffer=buf;g.gain.value=vol;src.connect(g).connect(audioCtx.destination);src.start();sfxDiag='AC再生OK:'+k}catch(e){sfxDiag='AC再生失敗:'+e.name}};
+    audioCtx.state==='running'?play():audioCtx.resume().then(play).catch(()=>{sfxDiag='resume失敗'});
+    return;
+  }
+  sfxDiag='バッファ未準備→スキップ:'+k;
+}
+function sfxStatus(){return[sfxDiag,'ctx='+(audioCtx?audioCtx.state:'無'),'bufs='+Object.keys(sfxBufs).join(','),'vol='+state.settings.volume].join(' / ')}
 function playChime(){playSfx('chime')}
 function playBell(type){playSfx(type==='end'?'bellEnd':'bell30')}
 function unlockAudio(){unlockSfx();try{if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();audioCtx.resume()}catch{}if(voiceUnlocked)return;voiceUnlocked=true;el.audioHint.hidden=true;if(window.speechSynthesis){const u=new SpeechSynthesisUtterance('');u.volume=0;speechSynthesis.speak(u)}}
