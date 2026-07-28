@@ -681,11 +681,20 @@ function unlockAudio(){unlockSfx();try{if(!audioCtx)audioCtx=new(window.AudioCon
 // ── タイマー制御 ──────────────────────────────────
 function startRoutine(){const total=state.openingSteps.length+state.mainSteps.length+state.closingSteps.length;if(!total){showToast('ステップがありません');return}buildFlatSteps();if(!state.flatSteps.length){showToast('ステップがありません');return}state.running=true;state.paused=false;gotoFlat(0)}
 function gotoFlat(idx){clearInterval(state.tickTimer);if(idx>=state.flatSteps.length){finishRoutine();return}if(idx<0)idx=0;state.flatIndex=idx;const fs=state.flatSteps[idx];state.remain=fs.sec;state.bell30done=false;state.announceDone=false;state.paused=false;state.running=true;renderRun();el.currentSpeech.textContent=fs.speech?'🗣 '+fs.speech:'';if(fs.speech?.trim()){
-  /* iOSのダッキング対策：前のステップの音声を先にキャンセルしてからチャイムを鳴らす */
   speechSynthesis?.cancel();stopSynthKeepAlive();
-  setTimeout(()=>{playChime();if(!state.confirmMode)beginCountdown();
-    setTimeout(()=>{if(state.flatIndex!==idx||!state.running)return;speak(fs.speech)},1100)},80);
-}else{if(!state.confirmMode)beginCountdown()}}
+  setTimeout(()=>{
+    playChime();
+    if(!state.confirmMode)beginCountdown();
+    setTimeout(()=>{
+      if(state.flatIndex!==idx||!state.running)return;
+      const onDone=state.confirmMode?()=>{if(state.flatIndex===idx&&state.running)setTimeout(()=>gotoFlat(idx+1),500)}:null;
+      speak(fs.speech,onDone);
+    },1100);
+  },80);
+}else{
+  if(state.confirmMode){setTimeout(()=>{if(state.flatIndex===idx&&state.running)gotoFlat(idx+1)},300)}
+  else{beginCountdown()}
+}}
 function beginCountdown(){
   clearInterval(state.tickTimer);
   _tickWallStart=Date.now();
