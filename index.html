@@ -275,9 +275,15 @@ details[open].details-card .details-summary::after{transform:rotate(-180deg)}
         <p style="font-weight:700;margin:12px 0 4px;color:var(--orange)">■ 各ステップの設定</p>
         <ul style="margin:0 0 12px;padding-left:1.4em">
           <li><strong>タイトル</strong>：実行画面に大きく表示される名前</li>
-          <li><strong>読み上げ文章</strong>：ステップ開始時に自動で読み上げる内容</li>
+          <li><strong>読み上げ文章</strong>：ステップ開始時に「ポーン」の後に自動で読み上げ</li>
           <li><strong>時間</strong>：そのステップのカウントダウン時間</li>
           <li><strong>残り時間のアナウンス</strong>：設定した時間前に「残り〇分です」と読み上げ</li>
+        </ul>
+
+        <p style="font-weight:700;margin:12px 0 4px">■ 合計時間の見方</p>
+        <ul style="margin:0 0 12px;padding-left:1.4em">
+          <li><strong>①＋②＝</strong>：試験本体の合計（開始の言葉＋くり返し部分）</li>
+          <li><strong>①＋②＋③＝</strong>：終了の合図まで含めた全体の合計</li>
         </ul>
 
         <p style="font-weight:700;margin:12px 0 4px">■ 実行中の操作</p>
@@ -288,11 +294,17 @@ details[open].details-card .details-summary::after{transform:rotate(-180deg)}
         </ul>
 
         <p style="font-weight:700;margin:12px 0 4px">■ 便利な機能</p>
-        <ul style="margin:0 0 4px;padding-left:1.4em">
+        <ul style="margin:0 0 12px;padding-left:1.4em">
           <li><strong>↩ 戻すボタン（ヘッダー）</strong>：編集を1つ前の状態に戻せる</li>
-          <li><strong>🔊 音声と順番を確認する</strong>：タイマーなしで音声だけ確認できるモード</li>
-          <li><strong>💾 一時保存</strong>：設定をブラウザ内に一時保存・切替えできる</li>
+          <li><strong>🔊 音声と順番を確認する</strong>：タイマーなしで全ステップの音声を順番に確認するモード。▶ 開始を押すと自動で全ステップを読み上げて終了</li>
           <li><strong>個別に編集</strong>：特定の回だけ異なる内容にしたいときに使用</li>
+        </ul>
+
+        <p style="font-weight:700;margin:12px 0 4px">■ 設定の保存・読み込み</p>
+        <ul style="margin:0 0 4px;padding-left:1.4em">
+          <li><strong>📥 本体に保存</strong>：ファイル名を入力して端末にJSONファイルとして保存</li>
+          <li><strong>📂 本体から読み込み</strong>：保存したJSONファイルを読み込んで設定を復元</li>
+          <li>iPhoneやiPadで使う場合は <strong>Safari</strong> で開いてください（他のブラウザでは一部機能が動作しない場合があります）</li>
         </ul>
       </div>
     </details>
