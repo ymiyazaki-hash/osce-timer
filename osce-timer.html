@@ -634,7 +634,7 @@ async function buildSfx(){
   /* OfflineAudioContext でチャイム音をプリレンダー */
   const sr=22050;
   const jobs=[
-    ['chime',1.3,buf=>{[[660,1,.34],[1320,.18,.2],[1980,.06,.12]].forEach(([f,a,d])=>{const o=buf.createOscillator(),g=buf.createGain();o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(.0001,0);g.gain.exponentialRampToValueAtTime(.9*a,0.012);g.gain.exponentialRampToValueAtTime(.0001,d);o.connect(g).connect(buf.destination);o.start(0);o.stop(1.3)})}],
+    ['chime',1.3,buf=>{[[660,.9,1.2],[1320,.18,.6],[1980,.06,.35]].forEach(([f,a,d])=>{const o=buf.createOscillator(),g=buf.createGain();o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(.0001,0);g.gain.exponentialRampToValueAtTime(a,0.012);g.gain.exponentialRampToValueAtTime(.0001,d);o.connect(g).connect(buf.destination);o.start(0);o.stop(1.3)})}],
     ['bell30',.3,buf=>{const o=buf.createOscillator(),g=buf.createGain();o.type='sine';o.frequency.value=660;g.gain.setValueAtTime(.0001,0);g.gain.exponentialRampToValueAtTime(.9,.015);g.gain.exponentialRampToValueAtTime(.0001,.22);o.connect(g).connect(buf.destination);o.start(0);o.stop(.28)}],
     ['bellEnd',.9,buf=>{for(let i=0;i<3;i++){const t=i*.28,o=buf.createOscillator(),g=buf.createGain();o.type='sine';o.frequency.value=880;g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.9,t+.015);g.gain.exponentialRampToValueAtTime(.0001,t+.22);o.connect(g).connect(buf.destination);o.start(t);o.stop(t+.25)}}]
   ];
