@@ -589,21 +589,22 @@ function speak(text,onDone){if(!text?.trim()||!window.speechSynthesis){onDone?.(
 // 壁時計ベースのタイマー変数
 let _tickWallStart=null,_tickRemainAtStart=null;
 
+let chimeBuffer=null,bellBuffer=null,bellEndBuffer=null;
+async function preRenderBuffers(){try{
+  const sr=22050;
+  function mkOff(dur){return new OfflineAudioContext(1,Math.ceil(sr*dur),sr)}
+  // chime: ポーン
+  {const off=mkOff(1.3);[[660,1,1.0],[1320,0.18,0.6],[1980,0.06,0.35]].forEach(([f,a,d])=>{const o=off.createOscillator(),g=off.createGain();o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(0.0001,0);g.gain.exponentialRampToValueAtTime(0.5*a,0.015);g.gain.exponentialRampToValueAtTime(0.0001,d);o.connect(g).connect(off.destination);o.start(0);o.stop(1.3)});chimeBuffer=await off.startRendering()}
+  // bell 30s: ピ
+  {const off=mkOff(0.3);const o=off.createOscillator(),g=off.createGain();o.type='sine';o.frequency.value=660;g.gain.setValueAtTime(0.0001,0);g.gain.exponentialRampToValueAtTime(0.4,0.02);g.gain.exponentialRampToValueAtTime(0.0001,0.22);o.connect(g).connect(off.destination);o.start(0);o.stop(0.25);bellBuffer=await off.startRendering()}
+  // bell end: ピピピ
+  {const off=mkOff(0.9);for(let i=0;i<3;i++){const t=i*0.28,o=off.createOscillator(),g=off.createGain();o.type='sine';o.frequency.value=880;g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(0.4,t+0.02);g.gain.exponentialRampToValueAtTime(0.0001,t+0.22);o.connect(g).connect(off.destination);o.start(t);o.stop(t+0.25)}bellEndBuffer=await off.startRendering()}
+}catch(e){console.warn('preRenderBuffers',e)}}
 function ensureAudio(){if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();return audioCtx.state==='running'?Promise.resolve():audioCtx.resume()}
-function playChime(){try{const p=ensureAudio();const v=state.settings.volume;if(v<=0)return;p.then(()=>{try{const vol=Math.min(0.9,v*0.55);const t=audioCtx.currentTime+0.05;
-// 「ポーン」：660Hzを芯にしてサイン波を重ねて1秒伸ばす
-const specs=[[660,1,1.0],[1320,0.18,0.6],[1980,0.06,0.35]];
-specs.forEach(([freq,amp,decay])=>{
-  const osc=audioCtx.createOscillator(),g=audioCtx.createGain();
-  osc.type='sine';osc.frequency.value=freq;
-  g.gain.setValueAtTime(0.0001,t);
-  g.gain.exponentialRampToValueAtTime(vol*amp,t+0.015);
-  g.gain.exponentialRampToValueAtTime(0.0001,t+decay);
-  osc.connect(g).connect(audioCtx.destination);
-  osc.start(t);osc.stop(t+1.1);
-})}catch{}})}catch{}}
-function playBell(type){try{const p=ensureAudio();const vv=state.settings.volume;if(vv<=0)return;p.then(()=>{try{const beeps=type==='end'?3:1,freq=type==='end'?880:660,vol=Math.min(0.9,vv*0.4);for(let i=0;i<beeps;i++){const t=audioCtx.currentTime+0.05+i*0.28,osc=audioCtx.createOscillator(),gain=audioCtx.createGain();osc.type='sine';osc.frequency.value=freq;gain.gain.setValueAtTime(0.0001,t);gain.gain.exponentialRampToValueAtTime(vol,t+0.02);gain.gain.exponentialRampToValueAtTime(0.0001,t+0.22);osc.connect(gain).connect(audioCtx.destination);osc.start(t);osc.stop(t+0.24)}}catch{}})}catch{}}
-function unlockAudio(){if(voiceUnlocked)return;voiceUnlocked=true;el.audioHint.hidden=true;try{if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();if(audioCtx.state==='suspended')audioCtx.resume()}catch{}if(window.speechSynthesis){const u=new SpeechSynthesisUtterance('');u.volume=0;speechSynthesis.speak(u)}}
+function playBuffer(buf){if(!buf||!audioCtx)return;const vol=Math.min(1,state.settings.volume);if(vol<=0)return;const src=audioCtx.createBufferSource(),g=audioCtx.createGain();src.buffer=buf;g.gain.value=vol;src.connect(g).connect(audioCtx.destination);src.start()}
+function playChime(){if(!state.settings.volume)return;ensureAudio().then(()=>playBuffer(chimeBuffer)).catch(()=>{})}
+function playBell(type){if(!state.settings.volume)return;ensureAudio().then(()=>playBuffer(type==='end'?bellEndBuffer:bellBuffer)).catch(()=>{})}
+function unlockAudio(){if(voiceUnlocked)return;voiceUnlocked=true;el.audioHint.hidden=true;try{if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();audioCtx.resume()}catch{}if(window.speechSynthesis){const u=new SpeechSynthesisUtterance('');u.volume=0;speechSynthesis.speak(u)}}
 
 // ── タイマー制御 ──────────────────────────────────
 function startRoutine(){const total=state.openingSteps.length+state.mainSteps.length+state.closingSteps.length;if(!total){showToast('ステップがありません');return}buildFlatSteps();if(!state.flatSteps.length){showToast('ステップがありません');return}state.running=true;state.paused=false;gotoFlat(0)}
@@ -770,6 +771,7 @@ function bindEvents(){
 
 // ── 初期化 ──────────────────────────────────
 function init(){
+  preRenderBuffers();
   loadSettings();
   try{
     const saved=JSON.parse(localStorage.getItem(LS_CURRENT));
