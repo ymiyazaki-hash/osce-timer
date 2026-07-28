@@ -701,7 +701,7 @@ function beginCountdown(){
       state.announceDone=true;const m=Math.floor(fs.announceAt/60),s=fs.announceAt%60;let t='残り';if(m>0)t+=m+'分';if(s>0)t+=s+'秒';speak(t+'です。')
     }
     if(state.settings.bell30&&!state.bell30done&&state.remain<=30&&prev>30){state.bell30done=true;playBell('30')}
-    if(state.remain<=0){state.remain=0;clearInterval(state.tickTimer);renderRun();if(state.settings.bellEnd)playBell('end');gotoFlat(state.flatIndex+1);return}
+    if(state.remain<=0){state.remain=0;clearInterval(state.tickTimer);renderRun();gotoFlat(state.flatIndex+1);return}
     renderRun();
   },500);
 }
