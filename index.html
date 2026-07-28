@@ -848,11 +848,13 @@ function bindEvents(){
     const data={version:3,exportedAt:new Date().toISOString(),name,openingSteps:state.openingSteps,mainSteps:state.mainSteps,closingSteps:state.closingSteps,repeatCount:state.repeatCount,rounds:state.rounds};
     const json=JSON.stringify(data,null,2);
     const blob=new Blob([json],{type:'application/json'});
-    // ① File System Access API (PC Chrome/Edge)
+    // ① File System Access API (Chrome/Edge デスクトップ)
     if(window.showSaveFilePicker){
       try{const h=await window.showSaveFilePicker({suggestedName:fname,types:[{description:'OSCEタイマー設定',accept:{'application/json':['.json']}}]});const w=await h.createWritable();await w.write(blob);await w.close();showToast('保存しました：'+fname);return}catch(e){if(e.name==='AbortError')return}
     }
-    // ② Web Share API (iPad/iPhone)
+    // ② <a download> (Chrome/Firefox/Safari デスクトップ)
+    try{const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=fname;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(()=>URL.revokeObjectURL(url),1000);showToast('保存しました：'+fname);return}catch(e){}
+    // ③ Web Share API (iPad/iPhone)
     try{
       const file=new File([blob],fname,{type:'application/json'});
       if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:name});return}
