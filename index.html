@@ -374,40 +374,21 @@ details[open].details-card .details-summary::after{transform:rotate(-180deg)}
     </details>
 
     <!-- データ保存・読み込み -->
-    <details class="card details-card">
-      <summary class="details-summary">💾 一時保存・読み込み</summary>
-      <div class="details-body">
-        <p class="card-note">このブラウザ内に一時保存されます。ブラウザのキャッシュを消すと消えます。別の試験パターンを切替えるときに使用してください。</p>
-
-        <!-- 一時保存 -->
-        <div style="display:flex;gap:8px;margin-bottom:16px">
-          <input id="saveNameInput" type="text" placeholder="名前（例：OSCE2025）" style="flex:1;padding:12px 14px;font-size:16px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text)" />
-          <button id="btnPresetSave" class="btn btn-blue" style="padding:12px 16px;white-space:nowrap">💾 一時保存</button>
-        </div>
-
-        <!-- 一時保存リスト -->
-        <div id="presetListArea">
-          <p style="font-size:.9rem;color:var(--text-sub);margin:0 0 8px">一時保存済みのデータ</p>
-          <div id="presetList" style="display:flex;flex-direction:column;gap:8px"></div>
-          <p id="presetEmpty" style="font-size:.9rem;color:var(--text-sub);display:none">（まだ保存されていません）</p>
-        </div>
-
-        <p class="card-note" style="margin-top:12px;background:var(--surface-2);border-radius:8px;padding:10px">⚠️ ブラウザのキャッシュを消去すると消えます。端末に残したい場合は下の「本体に保存」をお試しください。</p>
-
-        <!-- 本体に保存・読み込み（環境依存） -->
-        <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
-          <p style="font-size:.9rem;color:var(--text-sub);margin:0 0 8px">端末のファイルとして保存・読み込み（環境によっては動作しない場合があります）</p>
-          <div style="display:flex;gap:8px">
-            <button id="btnSaveDevice" class="btn btn-block" style="padding:14px;flex:1">📥 本体に保存</button>
-            <label for="importFile" class="btn btn-block" style="padding:14px;flex:1;cursor:pointer;display:flex;align-items:center;justify-content:center">📂 本体から読み込み</label>
-          </div>
-        </div>
-
-        <input id="importFile" type="file" style="display:none" />
-        <select id="presetSelect" style="display:none"></select>
-        <button id="btnPresetLoad" style="display:none"></button>
+    <div class="card" style="padding:20px">
+      <p style="font-size:.95rem;font-weight:600;margin:0 0 14px;color:var(--text)">💾 設定の保存・読み込み</p>
+      <div style="display:flex;gap:10px">
+        <button id="btnSaveDevice" class="btn btn-block" style="flex:1;padding:18px 12px;font-size:1.05rem;font-weight:700;background:var(--blue);color:#fff;border:none;border-radius:12px">📥 本体に保存</button>
+        <label for="importFile" class="btn btn-block" style="flex:1;padding:18px 12px;font-size:1.05rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:12px">📂 本体から読み込み</label>
       </div>
-    </details>
+      <p style="font-size:.82rem;color:var(--text-sub);margin:10px 0 0;text-align:center">設定をJSONファイルとして端末に保存・復元できます</p>
+      <input id="importFile" type="file" style="display:none" />
+      <input id="saveNameInput" style="display:none" />
+      <button id="btnPresetSave" style="display:none"></button>
+      <div id="presetList" style="display:none"></div>
+      <p id="presetEmpty" style="display:none"></p>
+      <select id="presetSelect" style="display:none"></select>
+      <button id="btnPresetLoad" style="display:none"></button>
+    </div>
   </section>
 </div>
 
