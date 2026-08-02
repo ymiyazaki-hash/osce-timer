@@ -524,7 +524,7 @@ function showDialog(title,msg,withInput,placeholder){return new Promise(resolve=
 // ── ユーティリティ ──────────────────────────────────
 function uid(){return 'id_'+Math.random().toString(36).slice(2,9)+Date.now().toString(36)}
 function fmt(s){s=Math.max(0,Math.round(s));return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')}
-function humanMin(s){s=Math.max(0,Math.round(s));const h=Math.floor(s/3600),m=Math.floor((s%3600)/60);if(h&&m)return`${h}時間${m}分`;if(h)return`${h}時間`;if(m)return`${m}分`;return`1分未満`}
+function humanMin(s){s=Math.max(0,Math.round(s));const h=Math.floor(s/3600),m=Math.floor((s%3600)/60);if(h&&m)return`${h}時間${m}分`;if(h)return`${h}時間`;if(m)return`${m}分`;return s>0?`1分未満`:`0分`}
 function humanSec(s){s=Math.max(0,Math.round(s));const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),r=s%60;if(h&&m&&r)return`${h}時間${m}分${r}秒`;if(h&&m)return`${h}時間${m}分`;if(h&&r)return`${h}時間${r}秒`;if(h)return`${h}時間`;if(m&&r)return`${m}分${r}秒`;if(m)return`${m}分`;return`${r}秒`}
 function newStep(o={}){return{id:o.id??uid(),title:o.title??'新しいステップ',sec:Number.isFinite(Number(o.sec))?Number(o.sec):60,speech:o.speech??'',announceAt:Number(o.announceAt)||0}}
 
@@ -676,7 +676,8 @@ function unlockSfx(){
 
 /* 3. 再生：AudioContext BufferSource（ダッキング非対象） */
 function playSfx(k){
-  const vol=Math.min(1,state.settings.volume);if(!vol)return;
+  /* GainNode は 1.0 超で増幅できる。スライダー最大3.0までベル音を大きくできる */
+  const vol=Math.max(0,Math.min(3,state.settings.volume));if(!vol)return;
   const buf=sfxBufs[k];
   if(buf&&audioCtx){
     const play=()=>{try{const src=audioCtx.createBufferSource(),g=audioCtx.createGain();src.buffer=buf;g.gain.value=vol;src.connect(g).connect(audioCtx.destination);src.start();sfxDiag='AC再生OK:'+k}catch(e){sfxDiag='AC再生失敗:'+e.name}};
@@ -825,16 +826,18 @@ function bindEvents(){
   el.btnAddClosing.addEventListener('click',()=>{addStep(state.closingSteps);persistCurrent();renderSectionList('closing',state.closingSteps,el.closingList,el.closingTime);renderSummaryBar()});
   el.btnLoadDefault.addEventListener('click',()=>{loadDefaultData();persistCurrent();applyToUI()});
   el.btnGoRun.addEventListener('click',()=>{if(!state.openingSteps.length&&!state.mainSteps.length&&!state.closingSteps.length){showToast('ステップを追加してください');return}state.confirmMode=false;unlockAudio();showView('run');resetRoutine()});
-  $('btnGoConfirm').addEventListener('click',()=>{unlockAudio();state.confirmMode=true;showView('run');resetRoutine();el.confirmModeLabel.hidden=false;buildFlatSteps()});
+  $('btnGoConfirm').addEventListener('click',()=>{if(!state.openingSteps.length&&!state.mainSteps.length&&!state.closingSteps.length){showToast('ステップを追加してください');return}unlockAudio();showView('run');resetRoutine();state.confirmMode=true;el.confirmModeLabel.hidden=false;buildFlatSteps();renderRun()});
   el.rateRange.addEventListener('input',()=>{state.settings.rate=parseFloat(el.rateRange.value);el.rateVal.textContent=state.settings.rate.toFixed(1);saveSettings()});
   el.volumeRange.addEventListener('input',()=>{state.settings.volume=parseFloat(el.volumeRange.value);el.volumeVal.textContent=state.settings.volume.toFixed(1);document.getElementById('runVolumeRange').value=state.settings.volume;document.getElementById('runVolumeVal').textContent=state.settings.volume.toFixed(1);saveSettings()});
   document.getElementById('runVolumeRange').addEventListener('input',e=>{state.settings.volume=parseFloat(e.target.value);document.getElementById('runVolumeVal').textContent=state.settings.volume.toFixed(1);el.volumeRange.value=state.settings.volume;el.volumeVal.textContent=state.settings.volume.toFixed(1);saveSettings()});
   document.addEventListener('visibilitychange',()=>{
     if(document.hidden)return;
+    /* 確認モードはカウントダウンしないので復帰処理の対象外 */
+    if(state.confirmMode)return;
     if(state.running&&!state.paused&&_tickWallStart!==null){
       const elapsed=Math.floor((Date.now()-_tickWallStart)/1000);
       state.remain=Math.max(0,_tickRemainAtStart-elapsed);
-      if(state.remain<=0){clearInterval(state.tickTimer);if(state.settings.bellEnd)playBell('end');gotoFlat(state.flatIndex+1)}
+      if(state.remain<=0){clearInterval(state.tickTimer);gotoFlat(state.flatIndex+1)}
       else renderRun();
     }
   });
