@@ -489,7 +489,7 @@ const LS_CURRENT='osceTimer7.current',LS_PRESETS='osceTimer7.presets',LS_SETTING
 const state={
   openingSteps:[],mainSteps:[],closingSteps:[],
   repeatCount:3,rounds:{},
-  running:false,paused:false,confirmMode:false,
+  running:false,paused:false,confirmMode:false,confirmPendingNext:null,
   flatSteps:[],flatIndex:-1,remain:0,tickTimer:null,bell30done:false,announceDone:false,
   settings:{rate:1,volume:1,voiceURI:'',bell30:true,bellEnd:true,theme:'light'}
 };
@@ -693,14 +693,19 @@ function unlockAudio(){unlockSfx();try{if(!audioCtx)audioCtx=new(window.AudioCon
 
 // ── タイマー制御 ──────────────────────────────────
 function startRoutine(){const total=state.openingSteps.length+state.mainSteps.length+state.closingSteps.length;if(!total){showToast('ステップがありません');return}buildFlatSteps();if(!state.flatSteps.length){showToast('ステップがありません');return}state.running=true;state.paused=false;gotoFlat(0)}
-function gotoFlat(idx){clearInterval(state.tickTimer);if(idx>=state.flatSteps.length){finishRoutine();return}if(idx<0)idx=0;state.flatIndex=idx;const fs=state.flatSteps[idx];state.remain=fs.sec;state.bell30done=false;state.announceDone=false;state.paused=false;state.running=true;renderRun();el.currentSpeech.textContent=fs.speech?'🗣 '+fs.speech:'';if(fs.speech?.trim()){
+function gotoFlat(idx){clearInterval(state.tickTimer);if(idx>=state.flatSteps.length){finishRoutine();return}if(idx<0)idx=0;state.flatIndex=idx;const fs=state.flatSteps[idx];state.remain=fs.sec;state.bell30done=false;state.announceDone=false;state.paused=false;state.running=true;state.confirmPendingNext=null;renderRun();el.currentSpeech.textContent=fs.speech?'🗣 '+fs.speech:'';if(fs.speech?.trim()){
   speechSynthesis?.cancel();stopSynthKeepAlive();
   setTimeout(()=>{
     playChime();
     if(!state.confirmMode)beginCountdown();
     setTimeout(()=>{
       if(state.flatIndex!==idx||!state.running)return;
-      const onDone=state.confirmMode?()=>{if(state.flatIndex===idx&&state.running)setTimeout(()=>gotoFlat(idx+1),500)}:null;
+      const onDone=state.confirmMode?()=>{
+        if(state.flatIndex!==idx||!state.running)return;
+        /* 一時停止中は進めず、再開時に続きから進む */
+        if(state.paused){state.confirmPendingNext=idx+1;return}
+        setTimeout(()=>{if(state.flatIndex===idx&&state.running&&!state.paused)gotoFlat(idx+1)},500);
+      }:null;
       speak(fs.speech,onDone);
     },1100);
   },80);
@@ -727,10 +732,16 @@ function beginCountdown(){
     renderRun();
   },500);
 }
-function togglePause(){if(!state.running){startRoutine();return}state.paused=!state.paused;if(state.paused)speechSynthesis?.pause();else speechSynthesis?.resume();updateStartBtn()}
+function togglePause(){if(!state.running){startRoutine();return}state.paused=!state.paused;
+  if(state.paused)speechSynthesis?.pause();
+  else{speechSynthesis?.resume();
+    /* 確認モード：一時停止中に読み上げが終わっていたら再開時に次へ進む */
+    if(state.confirmMode&&state.confirmPendingNext!=null){const n=state.confirmPendingNext;state.confirmPendingNext=null;updateStartBtn();gotoFlat(n);return}
+  }
+  updateStartBtn()}
 function prevFlat(){if(!state.running)return;gotoFlat(Math.max(0,state.flatIndex-1))}
 function nextFlat(){if(!state.running)return;gotoFlat(state.flatIndex+1)}
-function resetRoutine(){clearInterval(state.tickTimer);speechSynthesis?.cancel();state.running=false;state.paused=false;state.confirmMode=false;state.flatIndex=-1;state.remain=0;if(el.confirmModeLabel)el.confirmModeLabel.hidden=true;renderRun()}
+function resetRoutine(){clearInterval(state.tickTimer);speechSynthesis?.cancel();state.running=false;state.paused=false;state.confirmMode=false;state.confirmPendingNext=null;state.flatIndex=-1;state.remain=0;_tickWallStart=null;if(el.confirmModeLabel)el.confirmModeLabel.hidden=true;renderRun()}
 function finishRoutine(){clearInterval(state.tickTimer);state.running=false;state.paused=false;el.stepCounter.textContent=`Step ${state.flatSteps.length} / ${state.flatSteps.length}`;el.sectionPill.textContent='終了';el.sectionPill.className='section-pill closing';el.roundLabel.textContent='';el.currentTitle.textContent='✅ 終了';el.currentSpeech.textContent='';el.bigTime.textContent='00:00';el.bigTime.className='big-time';el.progressBar.style.width='100%';updateStartBtn()}
 
 // ── 実行画面レンダリング ──────────────────────────────────
