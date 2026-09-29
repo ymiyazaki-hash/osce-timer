@@ -689,10 +689,13 @@ function playSfx(k){
 function sfxStatus(){return[sfxDiag,'ctx='+(audioCtx?audioCtx.state:'無'),'bufs='+Object.keys(sfxBufs).join(','),'vol='+state.settings.volume].join(' / ')}
 function playChime(){playSfx('chime')}
 function playBell(type){playSfx(type==='end'?'bellEnd':'bell30')}
-function unlockAudio(){unlockSfx();try{if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();audioCtx.resume()}catch{}if(voiceUnlocked)return;voiceUnlocked=true;el.audioHint.hidden=true;if(window.speechSynthesis){const u=new SpeechSynthesisUtterance('');u.volume=0;speechSynthesis.speak(u)}}
+/* 画面スリープ防止：iPadが自動ロックされると試験中に止まるため */
+let wakeLock=null;
+async function requestWakeLock(){try{if(!('wakeLock' in navigator)||(wakeLock&&!wakeLock.released))return;wakeLock=await navigator.wakeLock.request('screen')}catch(e){console.warn('wakeLock',e&&e.name)}}
+function unlockAudio(){requestWakeLock();unlockSfx();try{if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();audioCtx.resume()}catch{}if(voiceUnlocked)return;voiceUnlocked=true;el.audioHint.hidden=true;if(window.speechSynthesis){const u=new SpeechSynthesisUtterance('');u.volume=0;speechSynthesis.speak(u)}}
 
 // ── タイマー制御 ──────────────────────────────────
-function startRoutine(){const total=state.openingSteps.length+state.mainSteps.length+state.closingSteps.length;if(!total){showToast('ステップがありません');return}buildFlatSteps();if(!state.flatSteps.length){showToast('ステップがありません');return}state.running=true;state.paused=false;gotoFlat(0)}
+function startRoutine(){requestWakeLock();const total=state.openingSteps.length+state.mainSteps.length+state.closingSteps.length;if(!total){showToast('ステップがありません');return}buildFlatSteps();if(!state.flatSteps.length){showToast('ステップがありません');return}state.running=true;state.paused=false;gotoFlat(0)}
 function gotoFlat(idx){clearInterval(state.tickTimer);if(idx>=state.flatSteps.length){finishRoutine();return}if(idx<0)idx=0;state.flatIndex=idx;const fs=state.flatSteps[idx];state.remain=fs.sec;state.bell30done=false;state.announceDone=false;state.paused=false;state.running=true;state.confirmPendingNext=null;renderRun();el.currentSpeech.textContent=fs.speech?'🗣 '+fs.speech:'';if(fs.speech?.trim()){
   speechSynthesis?.cancel();stopSynthKeepAlive();
   setTimeout(()=>{
@@ -737,6 +740,8 @@ function togglePause(){if(!state.running){startRoutine();return}state.paused=!st
   else{speechSynthesis?.resume();
     /* 確認モード：一時停止中に読み上げが終わっていたら再開時に次へ進む */
     if(state.confirmMode&&state.confirmPendingNext!=null){const n=state.confirmPendingNext;state.confirmPendingNext=null;updateStartBtn();gotoFlat(n);return}
+    /* 通常モード：止めていた時間を数えないよう、再開時点を基準に計り直す */
+    if(_tickWallStart!==null){_tickWallStart=Date.now();_tickRemainAtStart=state.remain}
   }
   updateStartBtn()}
 function prevFlat(){if(!state.running)return;gotoFlat(Math.max(0,state.flatIndex-1))}
@@ -843,6 +848,8 @@ function bindEvents(){
   document.getElementById('runVolumeRange').addEventListener('input',e=>{state.settings.volume=parseFloat(e.target.value);document.getElementById('runVolumeVal').textContent=state.settings.volume.toFixed(1);el.volumeRange.value=state.settings.volume;el.volumeVal.textContent=state.settings.volume.toFixed(1);saveSettings()});
   document.addEventListener('visibilitychange',()=>{
     if(document.hidden)return;
+    /* 画面に戻ったらスリープ防止を取り直す（非表示になると自動で解除されるため） */
+    if(state.running)requestWakeLock();
     /* 確認モードはカウントダウンしないので復帰処理の対象外 */
     if(state.confirmMode)return;
     if(state.running&&!state.paused&&_tickWallStart!==null){
