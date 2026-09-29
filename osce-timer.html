@@ -696,11 +696,16 @@ function unlockAudio(){requestWakeLock();unlockSfx();try{if(!audioCtx)audioCtx=n
 
 // ── タイマー制御 ──────────────────────────────────
 function startRoutine(){requestWakeLock();const total=state.openingSteps.length+state.mainSteps.length+state.closingSteps.length;if(!total){showToast('ステップがありません');return}buildFlatSteps();if(!state.flatSteps.length){showToast('ステップがありません');return}state.running=true;state.paused=false;gotoFlat(0)}
-function gotoFlat(idx){clearInterval(state.tickTimer);if(idx>=state.flatSteps.length){finishRoutine();return}if(idx<0)idx=0;state.flatIndex=idx;const fs=state.flatSteps[idx];state.remain=fs.sec;state.bell30done=false;state.announceDone=false;state.paused=false;state.running=true;state.confirmPendingNext=null;renderRun();el.currentSpeech.textContent=fs.speech?'🗣 '+fs.speech:'';if(fs.speech?.trim()){
+/* startAt：このステップを数え始める時刻。前のステップの「予定終了時刻」を渡すと、
+   端末の処理が遅れても遅れが次のステップに積み重ならない */
+function gotoFlat(idx,startAt){clearInterval(state.tickTimer);_tickWallStart=null;if(idx>=state.flatSteps.length){finishRoutine();return}if(idx<0)idx=0;state.flatIndex=idx;const fs=state.flatSteps[idx];state.remain=fs.sec;state.bell30done=false;state.announceDone=false;state.paused=false;state.running=true;state.confirmPendingNext=null;
+  /* カウントダウンはステップ切替と同時に始める（遅延させると古い開始時刻が残り、復帰時にステップが飛ぶ） */
+  if(!state.confirmMode)beginCountdown(startAt);
+  renderRun();el.currentSpeech.textContent=fs.speech?'🗣 '+fs.speech:'';if(fs.speech?.trim()){
   speechSynthesis?.cancel();stopSynthKeepAlive();
   setTimeout(()=>{
+    if(state.flatIndex!==idx||!state.running)return;
     playChime();
-    if(!state.confirmMode)beginCountdown();
     setTimeout(()=>{
       if(state.flatIndex!==idx||!state.running)return;
       const onDone=state.confirmMode?()=>{
@@ -714,15 +719,16 @@ function gotoFlat(idx){clearInterval(state.tickTimer);if(idx>=state.flatSteps.le
   },80);
 }else{
   if(state.confirmMode){setTimeout(()=>{if(state.flatIndex===idx&&state.running)gotoFlat(idx+1)},300)}
-  else{beginCountdown()}
 }}
-function beginCountdown(){
+function beginCountdown(startAt){
   clearInterval(state.tickTimer);
-  _tickWallStart=Date.now();
+  _tickWallStart=startAt||Date.now();
   _tickRemainAtStart=state.remain;
   updateStartBtn();
-  state.tickTimer=setInterval(()=>{
-    if(state.paused)return;
+  state.tickTimer=setInterval(tick,500);
+}
+function tick(){
+    if(state.paused||_tickWallStart===null)return;
     const elapsed=Math.floor((Date.now()-_tickWallStart)/1000);
     const prev=state.remain;
     state.remain=Math.max(0,_tickRemainAtStart-elapsed);
@@ -731,9 +737,8 @@ function beginCountdown(){
       state.announceDone=true;const m=Math.floor(fs.announceAt/60),s=fs.announceAt%60;let t='残り';if(m>0)t+=m+'分';if(s>0)t+=s+'秒';speak(t+'です。')
     }
     if(state.settings.bell30&&!state.bell30done&&state.remain<=30&&prev>30){state.bell30done=true;playBell('30')}
-    if(state.remain<=0){state.remain=0;clearInterval(state.tickTimer);renderRun();gotoFlat(state.flatIndex+1);return}
+    if(state.remain<=0){state.remain=0;clearInterval(state.tickTimer);const endAt=_tickWallStart+_tickRemainAtStart*1000;renderRun();gotoFlat(state.flatIndex+1,endAt);return}
     renderRun();
-  },500);
 }
 function togglePause(){if(!state.running){startRoutine();return}state.paused=!state.paused;
   if(state.paused)speechSynthesis?.pause();
@@ -852,12 +857,8 @@ function bindEvents(){
     if(state.running)requestWakeLock();
     /* 確認モードはカウントダウンしないので復帰処理の対象外 */
     if(state.confirmMode)return;
-    if(state.running&&!state.paused&&_tickWallStart!==null){
-      const elapsed=Math.floor((Date.now()-_tickWallStart)/1000);
-      state.remain=Math.max(0,_tickRemainAtStart-elapsed);
-      if(state.remain<=0){clearInterval(state.tickTimer);gotoFlat(state.flatIndex+1)}
-      else renderRun();
-    }
+    /* 復帰直後にすぐ1回計算して表示を合わせる（予定終了時刻の引き継ぎは tick に任せる） */
+    if(state.running&&!state.paused&&_tickWallStart!==null)tick();
   });
   el.btnTestVoice.addEventListener('click',()=>{unlockAudio();playChime();setTimeout(()=>speak('これは音声のテストです。試験を開始してください。'),1100)});
   $('btnTestChime').addEventListener('click',()=>{unlockAudio();playChime();
