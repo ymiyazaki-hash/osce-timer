@@ -677,6 +677,8 @@ function unlockSfx(){
 /* 3. 再生：AudioContext BufferSource（ダッキング非対象） */
 /* 試験用：ポンの音が声より大きく聞こえたため、効果音だけ6割に下げる */
 const CHIME_RATIO=0.6;
+/* 試験用：30秒前のベルは鳴らさない */
+const BELL30_ENABLED=false;
 function playSfx(k){
   /* GainNode は 1.0 超で増幅できる。スライダー最大3.0までベル音を大きくできる */
   const vol=Math.max(0,Math.min(3,state.settings.volume));if(!vol)return;
@@ -738,7 +740,7 @@ function tick(){
     if(fs?.announceAt>0&&!state.announceDone&&state.remain<=fs.announceAt&&prev>fs.announceAt){
       state.announceDone=true;const m=Math.floor(fs.announceAt/60),s=fs.announceAt%60;let t='試験時間、残り';if(m>0)t+=m+'分';if(s>0)t+=s+'秒';speak(t+'です。')
     }
-    if(state.settings.bell30&&!state.bell30done&&state.remain<=30&&prev>30){state.bell30done=true;playBell('30')}
+    if(BELL30_ENABLED&&state.settings.bell30&&!state.bell30done&&state.remain<=30&&prev>30){state.bell30done=true;playBell('30')}
     if(state.remain<=0){state.remain=0;clearInterval(state.tickTimer);const endAt=_tickWallStart+_tickRemainAtStart*1000;renderRun();gotoFlat(state.flatIndex+1,endAt);return}
     renderRun();
 }
