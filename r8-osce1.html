@@ -675,12 +675,14 @@ function unlockSfx(){
 }
 
 /* 3. 再生：AudioContext BufferSource（ダッキング非対象） */
+/* 試験用：ポンの音が声より大きく聞こえたため、効果音だけ6割に下げる */
+const CHIME_RATIO=0.6;
 function playSfx(k){
   /* GainNode は 1.0 超で増幅できる。スライダー最大3.0までベル音を大きくできる */
   const vol=Math.max(0,Math.min(3,state.settings.volume));if(!vol)return;
   const buf=sfxBufs[k];
   if(buf&&audioCtx){
-    const play=()=>{try{const src=audioCtx.createBufferSource(),g=audioCtx.createGain();src.buffer=buf;g.gain.value=vol;src.connect(g).connect(audioCtx.destination);src.start();sfxDiag='AC再生OK:'+k}catch(e){sfxDiag='AC再生失敗:'+e.name}};
+    const play=()=>{try{const src=audioCtx.createBufferSource(),g=audioCtx.createGain();src.buffer=buf;g.gain.value=vol*CHIME_RATIO;src.connect(g).connect(audioCtx.destination);src.start();sfxDiag='AC再生OK:'+k}catch(e){sfxDiag='AC再生失敗:'+e.name}};
     audioCtx.state==='running'?play():audioCtx.resume().then(play).catch(()=>{sfxDiag='resume失敗'});
     return;
   }
