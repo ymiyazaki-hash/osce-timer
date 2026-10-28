@@ -658,19 +658,34 @@ async function buildSfx(){
   try{if(navigator.audioSession)navigator.audioSession.type='playback'}catch{}
 }
 
-/* 2. アンロック：<audio>ダミーで iOS の再生制限を解除 ＆ AudioContext を resume */
+/* 2. アンロック：<audio> で iOS の再生制限を解除 ＆ AudioContext を resume
+   試験用：iPadは読み上げのあと AudioContext が止まり、ボタンを押すまで鳴らなくなる。
+   そのため ①ポン用の <audio> も最初のタップで解除しておき（止まっていたらこちらで鳴らす）、
+   ②無音を流し続けて AudioContext が止まりにくいようにする */
+function bufToWavURL(buf){const d=buf.getChannelData(0);return wavBlobURL(t=>{const i=Math.floor(t*buf.sampleRate);return i<d.length?d[i]:0},buf.duration,buf.sampleRate)}
+function ensureChimeEl(){
+  if(sfxEls.chime||!sfxBufs.chime)return sfxEls.chime;
+  const a=document.createElement('audio');a.src=bufToWavURL(sfxBufs.chime);a.preload='auto';
+  a.setAttribute('playsinline','');a.setAttribute('webkit-playsinline','');a.style.display='none';document.body.appendChild(a);
+  return sfxEls.chime=a;
+}
+let keepAliveSrc=null;
+function startKeepAlive(){
+  if(!audioCtx||keepAliveSrc)return;
+  try{const b=audioCtx.createBuffer(1,audioCtx.sampleRate,audioCtx.sampleRate),s=audioCtx.createBufferSource();s.buffer=b;s.loop=true;s.connect(audioCtx.destination);s.start();keepAliveSrc=s}catch{}
+}
 function unlockSfx(){
+  const ch=ensureChimeEl();
+  if(ch&&!ch._unlocked){ch.muted=true;const q=ch.play();const fin=()=>{try{ch.pause();ch.currentTime=0}catch{};ch.muted=false};if(q&&q.then)q.then(()=>{ch._unlocked=true;fin()}).catch(fin);else{ch._unlocked=true;fin()}}
+  if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  audioCtx.resume().then(startKeepAlive).catch(()=>{});
   if(sfxUnlocked)return;
   const dummy=sfxEls.dummy;
   if(!dummy)return;
   dummy.volume=0;
   const p=dummy.play();
   const done=(ok,err)=>{try{dummy.pause();dummy.currentTime=0}catch{};
-    if(ok){sfxUnlocked=true;sfxDiag='アンロックOK';
-      /* <audio>が再生できたらAudioContextも起こしておく */
-      if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();
-      audioCtx.resume().catch(()=>{})
-    }else sfxDiag='アンロック失敗:'+(err&&err.name||'?')};
+    if(ok){sfxUnlocked=true;sfxDiag='アンロックOK'}else sfxDiag='アンロック失敗:'+(err&&err.name||'?')};
   if(p&&p.then)p.then(()=>done(true)).catch(e=>done(false,e));else done(true);
 }
 
@@ -683,12 +698,15 @@ function playSfx(k){
   /* GainNode は 1.0 超で増幅できる。スライダー最大3.0までベル音を大きくできる */
   const vol=Math.max(0,Math.min(3,state.settings.volume));if(!vol)return;
   const buf=sfxBufs[k];
-  if(buf&&audioCtx){
-    const play=()=>{try{const src=audioCtx.createBufferSource(),g=audioCtx.createGain();src.buffer=buf;g.gain.value=vol*CHIME_RATIO;src.connect(g).connect(audioCtx.destination);src.start();sfxDiag='AC再生OK:'+k}catch(e){sfxDiag='AC再生失敗:'+e.name}};
-    audioCtx.state==='running'?play():audioCtx.resume().then(play).catch(()=>{sfxDiag='resume失敗'});
+  if(buf&&audioCtx&&audioCtx.state==='running'){
+    try{const src=audioCtx.createBufferSource(),g=audioCtx.createGain();src.buffer=buf;g.gain.value=vol*CHIME_RATIO;src.connect(g).connect(audioCtx.destination);src.start();sfxDiag='AC再生OK:'+k}catch(e){sfxDiag='AC再生失敗:'+e.name}
     return;
   }
-  sfxDiag='バッファ未準備→スキップ:'+k;
+  /* AudioContext が止まっている（iPadで読み上げのあと）→ 解除済みの <audio> で鳴らし、次に備えて起こしておく */
+  const ch=k==='chime'?ensureChimeEl():null;
+  if(ch){try{ch.volume=Math.min(1,vol*CHIME_RATIO);ch.currentTime=0;const q=ch.play();sfxDiag='audio再生:'+k+'(ctx='+(audioCtx?audioCtx.state:'無')+')';if(q&&q.catch)q.catch(e=>{sfxDiag='audio再生失敗:'+e.name})}catch(e){sfxDiag='audio再生失敗:'+e.name}}
+  else sfxDiag='再生できず:'+k;
+  if(audioCtx)audioCtx.resume().then(startKeepAlive).catch(()=>{});
 }
 function sfxStatus(){return[sfxDiag,'ctx='+(audioCtx?audioCtx.state:'無'),'bufs='+Object.keys(sfxBufs).join(','),'vol='+state.settings.volume].join(' / ')}
 function playChime(){playSfx('chime')}
